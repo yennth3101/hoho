@@ -1,0 +1,8 @@
+{
+  "name": "AI Tutor - Hệ thống Học tập Thông minh",
+  "description": "Ứng dụng AI hỗ trợ giảng viên tạo bài giảng và bài test tự động từ tài liệu, giúp sinh viên học tập hiệu quả hơn.",
+  "requestFramePermissions": [
+    "camera",
+    "microphone"
+  ]
+}

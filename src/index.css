@@ -1,0 +1,45 @@
+@import "tailwindcss";
+
+@layer base {
+  .markdown-body {
+    @apply text-slate-700 leading-relaxed;
+  }
+  .markdown-body h1 {
+    @apply text-3xl font-black text-slate-900 mb-6 mt-8 border-b border-slate-200 pb-2;
+  }
+  .markdown-body h2 {
+    @apply text-2xl font-bold text-slate-800 mb-4 mt-8;
+  }
+  .markdown-body h3 {
+    @apply text-xl font-bold text-slate-800 mb-3 mt-6;
+  }
+  .markdown-body p {
+    @apply mb-4;
+  }
+  .markdown-body ul {
+    @apply list-disc list-inside mb-4 space-y-2;
+  }
+  .markdown-body ol {
+    @apply list-decimal list-inside mb-4 space-y-2;
+  }
+  .markdown-body blockquote {
+    @apply border-l-4 border-indigo-500 bg-indigo-50 p-4 italic rounded-r-xl mb-4;
+  }
+  .markdown-body code {
+    @apply bg-slate-100 text-indigo-600 px-1.5 py-0.5 rounded font-mono text-sm;
+  }
+  .markdown-body pre {
+    @apply bg-slate-900 text-slate-100 p-4 rounded-2xl overflow-x-auto mb-4 font-mono text-sm;
+  }
+  .markdown-body strong {
+    @apply font-bold text-slate-900;
+  }
+}
+
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
