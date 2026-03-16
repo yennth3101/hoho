@@ -1,0 +1,50 @@
+{
+  "entities": {
+    "Course": {
+      "title": "Course",
+      "description": "Nội dung bài giảng và bài test do AI tạo ra",
+      "type": "object",
+      "properties": {
+        "lecture": { "type": "string", "description": "Nội dung bài giảng Markdown" },
+        "rawText": { "type": "string", "description": "Nội dung tài liệu thô" },
+        "quiz": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "question": { "type": "string" },
+              "options": { "type": "array", "items": { "type": "string" } },
+              "correctAnswer": { "type": "string" }
+            }
+          }
+        },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["lecture", "quiz", "updatedAt"]
+    },
+    "Result": {
+      "title": "Result",
+      "description": "Kết quả bài test của sinh viên",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "class": { "type": "string" },
+        "score": { "type": "string" },
+        "evaluation": { "type": "string" },
+        "feedback": { "type": "string" },
+        "timestamp": { "type": "string", "format": "date-time" }
+      },
+      "required": ["name", "class", "score", "evaluation", "timestamp"]
+    }
+  },
+  "firestore": {
+    "/courses/{courseId}": {
+      "schema": "Course",
+      "description": "Lưu trữ nội dung khóa học duy nhất"
+    },
+    "/results/{resultId}": {
+      "schema": "Result",
+      "description": "Lưu trữ kết quả của sinh viên"
+    }
+  }
+}

@@ -1,0 +1,42 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // ===============================================================
+    // Assumed Data Model
+    // ===============================================================
+    // Collection: courses
+    // Fields: lecture (string), rawText (string), quiz (array), updatedAt (timestamp)
+    //
+    // Collection: results
+    // Fields: name (string), class (string), score (string), evaluation (string), feedback (string), timestamp (timestamp)
+    // ===============================================================
+
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isAdmin() {
+      return isAuthenticated() && 
+        (request.auth.token.email == "yennth.math@gmail.com");
+    }
+
+    match /courses/{courseId} {
+      // Bất kỳ ai cũng có thể đọc bài giảng
+      allow read: if true;
+      // Chỉ admin (Giảng viên) mới có thể cập nhật bài giảng
+      allow write: if isAdmin();
+    }
+
+    match /results/{resultId} {
+      // Chỉ admin mới có thể xem bảng điểm
+      allow read: if isAdmin();
+      // Sinh viên có thể nộp bài
+      allow create: if true;
+    }
+
+    // Quy tắc cho phép test connection
+    match /test/{testId} {
+      allow read: if true;
+    }
+  }
+}

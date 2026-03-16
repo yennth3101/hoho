@@ -27,6 +27,22 @@ import * as XLSX from 'xlsx';
 import { generateCourseContent, evaluateResult, chatWithAI, AIContent, QuizQuestion } from './services/ai';
 import { cn } from './lib/utils';
 import Markdown from 'react-markdown';
+import { db, auth } from './firebase';
+import { 
+  doc, 
+  setDoc, 
+  onSnapshot, 
+  collection, 
+  addDoc, 
+  serverTimestamp,
+  getDocFromServer
+} from 'firebase/firestore';
+import { signInAnonymously, onAuthStateChanged, GoogleAuthProvider, signInWithPopup, signOut } from 'firebase/auth';
+import { 
+  MessageCircle, 
+  LogOut, 
+  LogIn 
+} from 'lucide-react';
 
 // Configure PDF.js worker
 pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
@@ -44,6 +60,8 @@ export default function App() {
   const [quizResult, setQuizResult] = useState<{ score: number; evaluation: string; feedback: string } | null>(null);
   const [rawText, setRawText] = useState('');
   const [error, setError] = useState<string | null>(null);
+  const [isAuthReady, setIsAuthReady] = useState(false);
+  const [user, setUser] = useState<any>(null);
   
   // Chat state
   const [chatMessages, setChatMessages] = useState<{ role: 'user' | 'ai', text: string }[]>([]);
@@ -51,16 +69,41 @@ export default function App() {
   const [isChatLoading, setIsChatLoading] = useState(false);
   const chatEndRef = useRef<HTMLDivElement>(null);
 
-  // Load data from localStorage on mount
+  // Load data from Firestore in real-time
   useEffect(() => {
-    const savedData = localStorage.getItem('ai_tutor_course');
-    const savedRawText = localStorage.getItem('ai_tutor_raw_text');
-    if (savedData) {
-      setCourseData(JSON.parse(savedData));
-    }
-    if (savedRawText) {
-      setRawText(savedRawText);
-    }
+    // Test connection
+    const testConnection = async () => {
+      try {
+        await getDocFromServer(doc(db, 'test', 'connection'));
+      } catch (error) {
+        if(error instanceof Error && error.message.includes('the client is offline')) {
+          console.error("Please check your Firebase configuration.");
+        }
+      }
+    };
+    testConnection();
+
+    // Listen for course updates
+    const unsubscribe = onSnapshot(doc(db, 'courses', 'current_course'), (snapshot) => {
+      if (snapshot.exists()) {
+        const data = snapshot.data() as AIContent & { rawText: string };
+        setCourseData({ lecture: data.lecture, quiz: data.quiz });
+        setRawText(data.rawText || '');
+      }
+    }, (error) => {
+      console.error("Firestore Error (courses):", error);
+    });
+
+    // Auth listener
+    const authUnsubscribe = onAuthStateChanged(auth, (user) => {
+      setUser(user);
+      setIsAuthReady(true);
+    });
+
+    return () => {
+      unsubscribe();
+      authUnsubscribe();
+    };
   }, []);
 
   // Scroll to bottom of chat
@@ -107,12 +150,29 @@ export default function App() {
         }
       }
       setRawText(combinedText);
-      localStorage.setItem('ai_tutor_raw_text', combinedText);
     } catch (err) {
       setError('Lỗi khi đọc file. Vui lòng thử lại.');
       console.error(err);
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const handleLogin = async () => {
+    const provider = new GoogleAuthProvider();
+    try {
+      await signInWithPopup(auth, provider);
+    } catch (err) {
+      console.error("Login error:", err);
+      setError("Không thể đăng nhập bằng Google.");
+    }
+  };
+
+  const handleLogout = async () => {
+    try {
+      await signOut(auth);
+    } catch (err) {
+      console.error("Logout error:", err);
     }
   };
 
@@ -126,13 +186,30 @@ export default function App() {
     setError(null);
     try {
       const result = await generateCourseContent(rawText);
+      
+      if (!user) {
+        setError('Vui lòng đăng nhập để lưu bài giảng.');
+        setIsLoading(false);
+        return;
+      }
+
+      // Save to Firestore for all students to see
+      await setDoc(doc(db, 'courses', 'current_course'), {
+        lecture: result.lecture,
+        quiz: result.quiz,
+        rawText: rawText,
+        updatedAt: serverTimestamp()
+      });
+
       setCourseData(result);
-      localStorage.setItem('ai_tutor_course', JSON.stringify(result));
-      localStorage.setItem('ai_tutor_raw_text', rawText);
-      alert('Tạo bài giảng thành công!');
+      alert('Tạo bài giảng thành công! Tất cả sinh viên hiện đã có thể truy cập.');
       setCurrentWindow('LECTURE');
-    } catch (err) {
-      setError('Lỗi khi tạo bài giảng từ AI. Vui lòng kiểm tra API Key.');
+    } catch (err: any) {
+      if (err.message?.includes('permission')) {
+        setError('Bạn không có quyền thực hiện thao tác này. Vui lòng đăng nhập đúng tài khoản Giảng viên.');
+      } else {
+        setError('Lỗi khi tạo bài giảng từ AI hoặc lưu vào database.');
+      }
       console.error(err);
     } finally {
       setIsLoading(false);
@@ -188,7 +265,17 @@ export default function App() {
       setQuizResult(result);
       setCurrentWindow('RESULT');
 
-      // Save to Google Sheets (Mocking the endpoint)
+      // Save to Firestore
+      await addDoc(collection(db, 'results'), {
+        name: studentInfo.name,
+        class: studentInfo.class,
+        score: `${score}/${courseData?.quiz.length}`,
+        evaluation: evaluation,
+        feedback: feedback,
+        timestamp: serverTimestamp()
+      });
+
+      // Save to Google Sheets (Optional fallback)
       // In a real app, you'd provide a Google Apps Script Web App URL
       const GOOGLE_SHEET_URL = import.meta.env.VITE_GOOGLE_SHEET_URL || process.env.VITE_GOOGLE_SHEET_URL;
       if (GOOGLE_SHEET_URL) {
@@ -227,6 +314,23 @@ export default function App() {
           </div>
 
           <div className="flex items-center gap-4">
+            {user ? (
+              <div className="flex items-center gap-3 bg-white p-1 pr-4 rounded-full shadow-sm border border-slate-100">
+                <img src={user.photoURL} alt={user.displayName} className="w-8 h-8 rounded-full" />
+                <span className="text-sm font-bold text-slate-700 hidden sm:inline">{user.displayName}</span>
+                <button onClick={handleLogout} className="text-slate-400 hover:text-red-500 transition-colors">
+                  <LogOut size={18} />
+                </button>
+              </div>
+            ) : (
+              <button 
+                onClick={handleLogin}
+                className="flex items-center gap-2 px-4 py-1.5 bg-white text-slate-600 rounded-full text-sm font-bold shadow-sm border border-slate-100 hover:bg-slate-50 transition-all"
+              >
+                <LogIn size={18} />
+                <span className="hidden sm:inline">Đăng nhập Giảng viên</span>
+              </button>
+            )}
             <button 
               onClick={() => setRole(role === 'TEACHER' ? 'STUDENT' : 'TEACHER')}
               className={cn(
