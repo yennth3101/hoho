@@ -190,7 +190,7 @@ export default function App() {
 
       // Save to Google Sheets (Mocking the endpoint)
       // In a real app, you'd provide a Google Apps Script Web App URL
-      const GOOGLE_SHEET_URL = process.env.VITE_GOOGLE_SHEET_URL;
+      const GOOGLE_SHEET_URL = import.meta.env.VITE_GOOGLE_SHEET_URL || process.env.VITE_GOOGLE_SHEET_URL;
       if (GOOGLE_SHEET_URL) {
         await fetch(GOOGLE_SHEET_URL, {
           method: 'POST',
